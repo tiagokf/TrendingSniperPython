@@ -5,27 +5,28 @@ class TrendSniperStrategy:
         self.logger = logging.getLogger('RoboCriptoCL.TrendSniperStrategy')
         self.config = config
 
-        # Parâmetros de análise técnica
+        # Define os períodos de EMA; se o config não tiver "ema_periods", usa o padrão [9, 21, 50]
         self.ema_periods = getattr(config, 'ema_periods', [9, 21, 50])
-        self.rsi_period = config.rsi_period or 14
+        self.rsi_period = getattr(config, 'rsi_period', 14)
         self.volume_period = getattr(config, 'volume_period', 3)
 
         self.logger.info(
-            f"TrendSniper initialized with EMAs{tuple(self.ema_periods)} and RSI({self.rsi_period})"
+            f"TrendSniper initialized with EMAs {tuple(self.ema_periods)} and RSI({self.rsi_period})"
         )
 
     def analyze(self, symbol_data):
         """
-        Análise técnica para determinar se há sinal de compra.
+        Realiza a análise técnica para determinar se há sinal de entrada.
+        Espera um dicionário com a chave "candles", onde cada candle deve conter 'close' e 'volume'.
         """
         candles = symbol_data.get("candles", [])
         if len(candles) < max(self.ema_periods + [self.rsi_period]):
-            return None  # Não há dados suficientes
+            return None  # Dados insuficientes
 
         closes = [c["close"] for c in candles]
         volumes = [c["volume"] for c in candles]
 
-        # Calcular EMAs
+        # Função auxiliar para calcular a EMA de um período
         def ema(values, period):
             multiplier = 2 / (period + 1)
             ema_values = [sum(values[:period]) / period]
@@ -37,12 +38,12 @@ class TrendSniperStrategy:
         ema_medium = ema(closes, self.ema_periods[1])[-1]
         ema_long = ema(closes, self.ema_periods[2])[-1]
 
-        # Calcular RSI
+        # Função auxiliar para calcular RSI de um período
         def calculate_rsi(data, period):
             gains = []
             losses = []
             for i in range(1, period + 1):
-                change = data[-(i + 1)] - data[-(i + 2)]
+                change = data[-i] - data[-i-1]
                 if change > 0:
                     gains.append(change)
                 else:
@@ -54,9 +55,9 @@ class TrendSniperStrategy:
 
         rsi = calculate_rsi(closes, self.rsi_period)
 
-        # Verificar tendência de alta
+        # Lógica simplificada: se as EMAs estão ordenadas (indicando tendência de alta) e o RSI está acima de um nível (por exemplo, 55), gera sinal.
         if ema_short > ema_medium > ema_long and rsi > 55:
-            self.logger.info(f"Uptrend detected: EMA({self.ema_periods}) and RSI({self.rsi_period}) = {rsi:.2f}")
+            self.logger.info(f"Uptrend detected: EMA values = ({ema_short:.2f}, {ema_medium:.2f}, {ema_long:.2f}) e RSI = {rsi:.2f}")
             return {
                 "signal": "buy",
                 "entry_price": closes[-1],
@@ -65,7 +66,6 @@ class TrendSniperStrategy:
                 "ema_medium": ema_medium,
                 "ema_long": ema_long,
             }
-
         return None
 
     def detect_uptrend(self, symbol_data):
@@ -78,7 +78,7 @@ class TrendSniperStrategy:
 
         closes = [c["close"] for c in candles]
 
-        # Calcular EMAs
+        # Função auxiliar para calcular EMA
         def ema(values, period):
             multiplier = 2 / (period + 1)
             ema_values = [sum(values[:period]) / period]
@@ -90,5 +90,11 @@ class TrendSniperStrategy:
         ema_medium = ema(closes, self.ema_periods[1])[-1]
         ema_long = ema(closes, self.ema_periods[2])[-1]
 
-        # Lógica simples de tendência de alta
         return ema_short > ema_medium > ema_long
+
+    def calculate_indicators(self, symbol_data):
+        """
+        Método necessário para o TradeManager.
+        Aqui, apenas faz um alias para o método 'analyze'.
+        """
+        return self.analyze(symbol_data)
