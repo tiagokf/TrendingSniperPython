@@ -1,0 +1,11 @@
+python-binance==1.0.16
+python-dotenv==1.0.0
+pandas==2.0.3
+numpy==1.24.3
+dash==2.14.0
+dash-bootstrap-components==1.5.0
+plotly==5.18.0
+requests==2.31.0
+websocket-client==1.6.3
+ta==0.10.2
+apscheduler==3.10.4
